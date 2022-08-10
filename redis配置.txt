@@ -1,0 +1,93 @@
+#树莓派.安装Redis环境
+#先下载安装包
+cd /home/pi/Downloads
+wget http://download.redis.io/releases/redis-stable.tar.gz
+
+#解压
+tar -zxf redis-stable.tar.gz 
+#编译
+cd /home/pi/Downloads/redis-stable
+sudo make
+
+#安装
+sudo make install
+#试启动看看
+redis-server 
+
+#正式使用要用后端模式, 按以下方法:
+#先复制配置文件
+sudo cp /home/pi/Downloads/redis-stable/redis.conf /etc/
+#修改配置文件内容
+sudo vi /etc/redis.conf
+#找到daemonize, 把no修改成yes,如下图
+#保存退出
+#再次启动服务 开机后使用这条命令
+sudo redis-server /etc/redis.conf 
+#用客户端连接测试一下
+redis-cli
+ 
+#检查是否有端口为6379的进程
+netstat -nlp
+
+#2、修改redis.conf配置文件
+#　(1)、#bind 127.0.0.1  将这里前面加上#否则远程无法连接redis或者只能连接ip为127.0.0.1的本地回环地址，无法连接真实的ip.
+#　(2)、daemonize yes   （这里讲原来的no改为yes,目的是为了设置后台运行）
+#  (3)、protected-mode no  （这里讲原来的yes改为no,目的是为了解决安全模式引起的报错）
+
+#3、移动redis的配置文件
+#1、在etc里面建立一个文件夹
+   mkdir  /etc/redis
+#   注意：权限问题777
+
+#2、移动配置文件到新建的文件夹下
+   cp  redis.conf  /etc/redis/
+
+#4杀死redis并重新后台开启redis
+pkill -9 redis-server
+#src/redis-server /etc/redis/redis.conf
+sudo redis-server /etc/redis.conf 
+
+#5、检测redis是否开启
+ps axu | grep redis-server
+#如果是最新时间开启的redis，则表明开启成功
+
+ #6客户端远程通过ip连接redis
+redis-cli -h 192.168.2.6 -p 6379
+
+#如果出现如下，则表明连接成功
+192.168.1.81:6379>
+
+#Redis使用认证密码登录
+#1. 修改配置文件
+#Redis的配置文件默认在/etc/redis.conf，找到如下行：
+#requirepass foobared
+#去掉前面的注释，并修改为所需要的密码：
+requirepass myPassword   #（其中myPassword就是要设置的密码）
+
+#2. 重启Redis
+#如果Redis已经配置为service服务，可以通过以下方式重启：
+service redis restart
+#如果Redis没有配置为service服务，可以通过以下方式重启：
+/usr/local/bin/redis-cli shutdown
+/usr/local/bin/redis-server /etc/redis.conf
+
+#3. 登录验证
+#设置Redis认证密码后，客户端登录时需要使用-a参数输入认证密码，不添加该参数虽然也可以登录成功，但是没有任何操作权限。如下：
+redis-cli -h 127.0.0.1 -p 6379
+#使用密码认证登录，并验证操作权限：
+redis-cli -h 127.0.0.1 -p 6379 -a myPassword
+redis-cli -h 127.0.0.1 -p 6379 -a 123
+config get requirepass
+
+#除了按上面的方式在登录时，使用-a参数输入登录密码外。也可以不指定，在连接后进行验证：
+redis-cli -h 127.0.0.1 -p 6379
+
+#4. 在命令行客户端配置密码（redis重启前有效）
+#前面介绍了通过redis.conf配置密码，这种配置方式需要重新启动Redis。也可以通命令行客户端配置密码，这种配置方式不用重新启动Redis。配置方式如下
+config set requirepass newPassword
+config get requirepass
+#注意：使用命令行客户端配置密码，重启Redis后仍然会使用redis.conf配置文件中的密码。
+
+#5. 在Redis集群中使用认证密码
+#如果Redis服务器，使用了集群。除了在master中配置密码外，也需要在slave中进行相应配置。在slave的配置文件中找到如下行，去掉注释并修改与master相同的密码即可：
+# masterauth master-password
